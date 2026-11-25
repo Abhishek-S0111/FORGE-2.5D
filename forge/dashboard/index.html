@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FORGE-2.5D: Foveated LiDAR Mapping</title>
+  <style>
+    :root {
+      --bg-page: #f8fafc;
+      --bg-canvas: #edf2f7;
+      --card-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --border-subtle: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --primary-blue: #2563eb;
+      --primary-hover: #1d4ed8;
+      --color-drivable: #16a34a;
+      --color-nondrivable: #d97706;
+      --color-static: #dc2626;
+      --color-dynamic: #2563eb;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 50;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+
+    .badge-tag {
+      background: #f1f5f9;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .btn-team-toggle {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-team-toggle:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+
+    /* Modal Backdrop & Small Page Dialog */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal-content {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+      width: 580px;
+      max-width: 94vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.2px;
+    }
+
+    .modal-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      line-height: 1;
+    }
+
+    .modal-close-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-primary);
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .team-info-card {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .team-info-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+      display: block;
+    }
+
+    .team-info-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .team-info-val.highlight {
+      color: var(--primary-blue);
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    .team-section {
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .team-ps-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+
+    .team-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+
+    .members-table-container {
+      margin-top: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    .members-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .members-table th {
+      background: #f1f5f9;
+      color: var(--text-secondary);
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .members-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+    }
+
+    .members-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .members-table tr:hover {
+      background: #f8fafc;
+    }
+
+    .member-role {
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      display: inline-block;
+    }
+
+    .member-role.lead {
+      background: #dbeafe;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .member-email {
+      color: var(--text-secondary);
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    select, button {
+      background: #ffffff;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    select:hover, button:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    select:focus {
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .btn-primary {
+      background: var(--primary-blue);
+      color: #ffffff;
+      border-color: var(--primary-blue);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    /* Map Canvas Container */
+    #map-viewport {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      cursor: grab;
+      background: var(--bg-canvas);
+    }
+
+    #map-viewport.grabbing {
+      cursor: grabbing;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Google Maps Navigation Controls (Bottom Right) */
+    .gmap-nav-controls {
+      position: absolute;
+      right: 20px;
+      bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      z-index: 40;
+    }
+
+    .nav-btn {
+      width: 40px;
+      height: 40px;
+      background: #ffffff;
+      border: none;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 0;
+      transition: background 0.15s ease;
+    }
+
+    .nav-btn:last-child {
+      border-bottom: none;
+    }
+
+    .nav-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-primary);
+    }
+
+    /* Left Floating Telemetry Card */
+    .floating-card {
+      position: absolute;
+      top: 72px;
+      left: 20px;
+      width: 310px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px 16px;
+      z-index: 40;
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-fps {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
+
+    .metric-val {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-family: monospace;
+    }
+
+    .progress-track {
+      height: 5px;
+      background: #f1f5f9;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 2px 0 10px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--primary-blue);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-fill.green {
+      background: var(--color-drivable);
+    }
+
+    /* Floating Legend (Bottom Left) */
+    .floating-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 20px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px 14px;
+      z-index: 40;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-size: 12px;
+    }
+
+    .legend-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .legend-color-box {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    /* Tooltip Popover */
+    #tooltip {
+      position: absolute;
+      display: none;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+      color: var(--text-primary);
+    }
+
+    .tooltip-title {
+      font-weight: 700;
+      color: var(--primary-blue);
+      margin-bottom: 4px;
+    }
+
+    /* Layer Toggles (Top Right) */
+    .layer-controls {
+      position: absolute;
+      top: 72px;
+      right: 20px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      gap: 6px;
+      z-index: 40;
+      box-shadow: var(--shadow-md);
+    }
+
+    .layer-btn {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .layer-btn:hover {
+      background: #f8fafc;
+    }
+
+    .layer-btn.active {
+      color: var(--primary-blue);
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand">
+      <span class="brand-title">FORGE-2.5D</span>
+      <span class="badge-tag">SIH26053</span>
+      <button class="btn-team-toggle" onclick="openTeamModal()" title="Click to view Team and Hackathon details">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        Team BYTEFORCE123
+      </button>
+    </div>
+
+    <div class="top-controls">
+      <div class="control-group">
+        <label for="category-select">Data Source:</label>
+        <select id="category-select" onchange="onCategoryChanged()">
+          <option value="labelled">Labelled Data (IITH Ground Truth)</option>
+          <option value="raw">Raw Data (Model Inference)</option>
+          <option value="synthetic">Synthetic Urban Scene (64-Beam)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="scan-select">Scan File:</label>
+        <select id="scan-select" style="min-width: 180px;">
+          <option value="">Loading scans...</option>
+        </select>
+      </div>
+
+      <button class="btn-primary" id="refresh-btn" onclick="fetchScanData()">Reload</button>
+    </div>
+  </header>
+
+  <!-- Layer Toggles -->
+  <div class="layer-controls">
+    <button class="layer-btn active" id="btn-ring0" onclick="toggleLayer('ring0')">Ring 0 (10m @ 5cm)</button>
+    <button class="layer-btn active" id="btn-ring1" onclick="toggleLayer('ring1')">Ring 1 (50m @ 25cm)</button>
+    <button class="layer-btn active" id="btn-points" onclick="toggleLayer('points')">3D Points</button>
+    <button class="layer-btn active" id="btn-grid" onclick="toggleLayer('grid')">Rings & Grid</button>
+  </div>
+
+  <!-- Left Floating Telemetry Card -->
+  <div class="floating-card">
+    <div class="card-header">
+      <span class="card-title">Telemetry & Status</span>
+      <span class="badge-fps" id="fps-val">-- FPS</span>
+    </div>
+
+    <div class="metric-row">
+      <span>Data Mode:</span>
+      <span class="metric-val" id="data-mode-val" style="color: var(--primary-blue)">Loading...</span>
+    </div>
+
+    <div class="metric-row">
+      <span>Active Scan:</span>
+      <span class="metric-val" id="scan-name-val">Loading...</span>
+    </div>
+
+    <div class="metric-row" style="margin-top: 6px;">
+      <span>Input Decimation:</span>
+      <span class="metric-val" id="decimation-val">--%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="decimation-bar" style="width: 0%"></div>
+    </div>
+
+    <div class="metric-row">
+      <span>RAM Savings vs Uniform 2.5D:</span>
+      <span class="metric-val" id="savings-25d-val" style="color: var(--color-drivable)">--%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill green" id="savings-bar" style="width: 0%"></div>
+    </div>
+
+    <div class="metric-row">
+      <span>FORGE-2.5D RAM Footprint:</span>
+      <span class="metric-val" id="ram-val">-- MB</span>
+    </div>
+
+    <div class="metric-row">
+      <span>Total Active Cells:</span>
+      <span class="metric-val" id="cells-val">--</span>
+    </div>
+
+    <div class="metric-row">
+      <span>Detected Potholes / Dips:</span>
+      <span class="metric-val" id="potholes-val" style="color: var(--color-static)">--</span>
+    </div>
+
+    <div class="metric-row">
+      <span>End-to-End Latency:</span>
+      <span class="metric-val" id="latency-val">-- ms</span>
+    </div>
+  </div>
+
+  <!-- Floating Legend -->
+  <div class="floating-legend">
+    <div class="legend-header">Semantic Classes</div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background: var(--color-drivable)"></div>
+      <span>Class 0: Drivable Surface (Road)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background: var(--color-nondrivable)"></div>
+      <span>Class 1: Non-Drivable / Curb / Pothole</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background: var(--color-static)"></div>
+      <span>Class 2: Static Obstacle (Pole, Wall)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color-box" style="background: var(--color-dynamic)"></div>
+      <span>Class 3: Dynamic Object (Car, Pedestrian)</span>
+    </div>
+  </div>
+
+  <!-- Google Maps Style Navigation Controls -->
+  <div class="gmap-nav-controls">
+    <button class="nav-btn" onclick="zoomIn()" title="Zoom In">+</button>
+    <button class="nav-btn" onclick="zoomOut()" title="Zoom Out">&minus;</button>
+    <button class="nav-btn" onclick="resetView()" title="Center Map" style="font-size: 15px;">&#8982;</button>
+  </div>
+
+  <!-- Map Canvas Viewport -->
+  <div id="map-viewport">
+    <canvas id="map-canvas"></canvas>
+  </div>
+
+  <!-- Hover Tooltip -->
+  <div id="tooltip"></div>
+
+  <!-- Team Details Modal / Small Page -->
+  <div id="team-modal-backdrop" class="modal-backdrop" onclick="closeTeamModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">BYTEFORCE123</h2>
+          <p class="modal-subtitle">Smart India Hackathon 2026 (SIH 2026)</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeTeamModal()" title="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="team-grid">
+          <div class="team-info-card">
+            <span class="team-info-label">Team ID</span>
+            <span class="team-info-val highlight">146825</span>
+          </div>
+          <div class="team-info-card">
+            <span class="team-info-label">Team Name</span>
+            <span class="team-info-val">BYTEFORCE123</span>
+          </div>
+          <div class="team-info-card">
+            <span class="team-info-label">Problem Statement ID</span>
+            <span class="team-info-val highlight">SIH26053</span>
+          </div>
+          <div class="team-info-card">
+            <span class="team-info-label">Category & Theme</span>
+            <span class="team-info-val">Software | Smart Vehicles</span>
+          </div>
+        </div>
+
+        <div class="team-section">
+          <span class="team-info-label">Team Members & Contributors</span>
+          <div class="members-table-container">
+            <table class="members-table">
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Member Name</th>
+                  <th>Member Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="member-role lead">LEADER</span></td>
+                  <td><strong>Abhishek Sinha</strong></td>
+                  <td class="member-email">abhi.bt23cs07@opju.ac.in</td>
+                </tr>
+                <tr>
+                  <td><span class="member-role">TEAM_MEMBER</span></td>
+                  <td>Milan Kumar Modak</td>
+                  <td class="member-email">mila.bt23cs57@opju.ac.in</td>
+                </tr>
+                <tr>
+                  <td><span class="member-role">TEAM_MEMBER</span></td>
+                  <td>Abhishek Singh</td>
+                  <td class="member-email">abhi.bt23cs06@opju.ac.in</td>
+                </tr>
+                <tr>
+                  <td><span class="member-role">TEAM_MEMBER</span></td>
+                  <td>Anjal Suryawanshi</td>
+                  <td class="member-email">anjal874suryawanshi@gmail.com</td>
+                </tr>
+                <tr>
+                  <td><span class="member-role">TEAM_MEMBER</span></td>
+                  <td>Shrishti Sahu</td>
+                  <td class="member-email">shri.bt23me30@opju.ac.in</td>
+                </tr>
+                <tr>
+                  <td><span class="member-role">TEAM_MEMBER</span></td>
+                  <td>Mansi Shukla</td>
+                  <td class="member-email">shuklamansi568@gmail.com</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="team-section">
+          <span class="team-info-label">Problem Statement Title</span>
+          <div class="team-ps-title">
+            Adaptive Variable Resolution 2.5D Lidar Mapping for Dynamic Environment Perception
+          </div>
+        </div>
+
+        <div class="team-section">
+          <span class="team-info-label">Project Framework</span>
+          <p class="team-desc">
+            <b>FORGE-2.5D</b>: Unified framework transforming raw LiDAR point clouds into a range-adaptive 2-ring foveated 2.5D grid with recursive 1D Kalman surface elevation, cutting memory by 93.8% and executing at 22+ FPS on edge hardware.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("map-canvas");
+    const ctx = canvas.getContext("2d");
+    const viewport = document.getElementById("map-viewport");
+    const tooltip = document.getElementById("tooltip");
+
+    let scanData = null;
+
+    // Viewport transform state
+    let zoom = 14.0; // pixels per meter
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startDragX = 0;
+    let startDragY = 0;
+
+    // Layer visibility
+    const layers = {
+      ring0: true,
+      ring1: true,
+      points: true,
+      grid: true
+    };
+
+    function resizeCanvas() {
+      canvas.width = viewport.clientWidth * window.devicePixelRatio;
+      canvas.height = viewport.clientHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      render();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    // Coordinate conversions: World (m) <-> Screen (px)
+    function worldToScreen(x, y) {
+      const centerX = viewport.clientWidth / 2 + panX;
+      const centerY = viewport.clientHeight / 2 + panY;
+      // In robotics: X is forward (up on screen), Y is left (left on screen)
+      const sx = centerX - y * zoom;
+      const sy = centerY - x * zoom;
+      return { x: sx, y: sy };
+    }
+
+    function screenToWorld(sx, sy) {
+      const centerX = viewport.clientWidth / 2 + panX;
+      const centerY = viewport.clientHeight / 2 + panY;
+      const y = -(sx - centerX) / zoom;
+      const x = -(sy - centerY) / zoom;
+      return { x: x, y: y };
+    }
+
+    // Google Maps Navigation Mouse Events
+    viewport.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      viewport.classList.add("grabbing");
+      startDragX = e.clientX - panX;
+      startDragY = e.clientY - panY;
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDragging = false;
+      viewport.classList.remove("grabbing");
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (isDragging) {
+        panX = e.clientX - startDragX;
+        panY = e.clientY - startDragY;
+        render();
+      } else {
+        checkTooltip(e.clientX, e.clientY);
+      }
+    });
+
+    // Zoom on wheel (around cursor location)
+    viewport.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      const worldBefore = screenToWorld(mouseX, mouseY);
+      zoom = Math.max(2.0, Math.min(80.0, zoom * zoomFactor));
+      const screenAfter = worldToScreen(worldBefore.x, worldBefore.y);
+
+      panX += (mouseX - screenAfter.x);
+      panY += (mouseY - screenAfter.y);
+      render();
+    });
+
+    function zoomIn() {
+      zoom = Math.min(80.0, zoom * 1.25);
+      render();
+    }
+
+    function zoomOut() {
+      zoom = Math.max(2.0, zoom * 0.8);
+      render();
+    }
+
+    function resetView() {
+      zoom = 14.0;
+      panX = 0;
+      panY = 0;
+      render();
+    }
+
+    function toggleLayer(name) {
+      layers[name] = !layers[name];
+      const btn = document.getElementById("btn-" + name);
+      if (btn) {
+        btn.classList.toggle("active", layers[name]);
+      }
+      render();
+    }
+
+    // Main Render Loop
+    function render() {
+      const w = viewport.clientWidth;
+      const h = viewport.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      // Light background fill
+      ctx.fillStyle = "#edf2f7";
+      ctx.fillRect(0, 0, w, h);
+
+      // 1. Draw Grid lines and Concentric Rings
+      if (layers.grid) {
+        drawGridAndRings(w, h);
+      }
+
+      if (!scanData) return;
+
+      // 2. Draw Ring 1 Cells (50m @ 25cm)
+      if (layers.ring1 && scanData.ring1_cells) {
+        drawCells(scanData.ring1_cells, 0.25, 0.75);
+      }
+
+      // 3. Draw Ring 0 Cells (10m @ 5cm)
+      if (layers.ring0 && scanData.ring0_cells) {
+        drawCells(scanData.ring0_cells, 0.05, 0.88);
+      }
+
+      // 4. Draw 3D Point Cloud overlay
+      if (layers.points && scanData.points_sample) {
+        drawPoints(scanData.points_sample);
+      }
+
+      // 5. Draw Ego Vehicle Center
+      drawEgoOrigin();
+    }
+
+    function drawGridAndRings(w, h) {
+      const center = worldToScreen(0, 0);
+
+      // Faint coordinate axes
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1;
+
+      // Vertical line (X-axis forward)
+      ctx.beginPath();
+      ctx.moveTo(center.x, 0);
+      ctx.lineTo(center.x, h);
+      ctx.stroke();
+
+      // Horizontal line (Y-axis lateral)
+      ctx.beginPath();
+      ctx.moveTo(0, center.y);
+      ctx.lineTo(w, center.y);
+      ctx.stroke();
+
+      // Concentric circles
+      ctx.lineWidth = 1.2;
+
+      // Ring 0: 10m
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, 10.0 * zoom, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(37, 99, 235, 0.75)";
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+
+      // Ring 1: 50m
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, 50.0 * zoom, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(100, 116, 139, 0.6)";
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Ring labels
+      ctx.fillStyle = "#1e40af";
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText("Ring 0 Boundary (10m @ 5cm)", center.x + 8, center.y - 10.0 * zoom - 4);
+
+      ctx.fillStyle = "#475569";
+      ctx.fillText("Ring 1 Boundary (50m @ 25cm)", center.x + 8, center.y - 50.0 * zoom - 4);
+    }
+
+    // Natural GIS color palette (clean & high contrast on light canvas)
+    const classColors = {
+      0: "#16a34a", // Drivable Road (Green)
+      1: "#d97706", // Non-drivable / Pothole (Amber)
+      2: "#dc2626", // Static Obstacle (Red)
+      3: "#2563eb"  // Dynamic Object (Blue)
+    };
+
+    function drawCells(cellLayer, cellSizeM, alpha) {
+      const xs = cellLayer.x;
+      const ys = cellLayer.y;
+      const lbls = cellLayer.label;
+      const potholes = cellLayer.pothole;
+      const sizePx = Math.max(1.5, cellSizeM * zoom);
+
+      ctx.globalAlpha = alpha;
+      for (let i = 0; i < xs.length; i++) {
+        const sc = worldToScreen(xs[i], ys[i]);
+        if (sc.x < -10 || sc.x > viewport.clientWidth + 10 || sc.y < -10 || sc.y > viewport.clientHeight + 10) {
+          continue;
+        }
+
+        ctx.fillStyle = classColors[lbls[i]] || "#94a3b8";
+        ctx.fillRect(sc.x - sizePx / 2, sc.y - sizePx / 2, sizePx, sizePx);
+
+        // Highlight detected potholes with clean red border
+        if (potholes[i]) {
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(sc.x - sizePx, sc.y - sizePx, sizePx * 2, sizePx * 2);
+        }
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
+    function drawPoints(sample) {
+      const xs = sample.x;
+      const ys = sample.y;
+
+      ctx.fillStyle = "#1e293b"; // Dark slate for contrast
+      for (let i = 0; i < xs.length; i++) {
+        const sc = worldToScreen(xs[i], ys[i]);
+        if (sc.x < -5 || sc.x > viewport.clientWidth + 5 || sc.y < -5 || sc.y > viewport.clientHeight + 5) {
+          continue;
+        }
+        ctx.beginPath();
+        ctx.arc(sc.x, sc.y, 1.2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+
+    function drawEgoOrigin() {
+      const center = worldToScreen(0, 0);
+
+      // Google Maps style navigation chevron
+      ctx.fillStyle = "#2563eb";
+      ctx.beginPath();
+      ctx.moveTo(center.x, center.y - 12);
+      ctx.lineTo(center.x - 7, center.y + 7);
+      ctx.lineTo(center.x, center.y + 3);
+      ctx.lineTo(center.x + 7, center.y + 7);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = "#1e40af";
+      ctx.font = "bold 10px sans-serif";
+      ctx.fillText("EGO", center.x + 9, center.y + 4);
+    }
+
+    // Inspect Cell Tooltip on Hover
+    function checkTooltip(mouseX, mouseY) {
+      if (!scanData) return;
+      const world = screenToWorld(mouseX, mouseY);
+      const d = Math.sqrt(world.x * world.x + world.y * world.y);
+
+      let targetLayer = null;
+      if (d <= 10.0 && scanData.ring0_cells) {
+        targetLayer = scanData.ring0_cells;
+      } else if (d <= 50.0 && scanData.ring1_cells) {
+        targetLayer = scanData.ring1_cells;
+      }
+
+      if (!targetLayer) {
+        tooltip.style.display = "none";
+        return;
+      }
+
+      // Find nearest cell
+      let minSq = Infinity;
+      let nearestIdx = -1;
+      const xs = targetLayer.x;
+      const ys = targetLayer.y;
+
+      for (let i = 0; i < xs.length; i++) {
+        const dx = xs[i] - world.x;
+        const dy = ys[i] - world.y;
+        const sq = dx * dx + dy * dy;
+        if (sq < minSq) {
+          minSq = sq;
+          nearestIdx = i;
+        }
+      }
+
+      if (nearestIdx !== -1 && minSq < 0.8) {
+        const lblId = targetLayer.label[nearestIdx];
+        const classNames = ["Drivable Surface", "Non-Drivable / Curb / Pothole", "Static Obstacle", "Dynamic Object"];
+        tooltip.style.display = "block";
+        tooltip.style.left = (mouseX + 14) + "px";
+        tooltip.style.top = (mouseY + 14) + "px";
+        tooltip.innerHTML = `
+          <div class="tooltip-title">${classNames[lblId] || "Unknown"}</div>
+          <div><b>Position:</b> X: ${targetLayer.x[nearestIdx].toFixed(2)}m, Y: ${targetLayer.y[nearestIdx].toFixed(2)}m</div>
+          <div><b>Elevation (h):</b> ${targetLayer.elevation[nearestIdx].toFixed(3)} m</div>
+          <div><b>Variance (&sigma;&sup2;):</b> ${targetLayer.variance[nearestIdx].toFixed(4)}</div>
+          <div><b>Ring:</b> ${d <= 10.0 ? "Ring 0 (5cm fovea)" : "Ring 1 (25cm coarse)"}</div>
+          ${targetLayer.pothole[nearestIdx] ? '<div style="color:#dc2626; font-weight:bold; margin-top:2px;">POTHOLE / DEPRESSION</div>' : ''}
+        `;
+      } else {
+        tooltip.style.display = "none";
+      }
+    }
+
+    // Fetch and Populate Scan Data
+    let availableScans = null;
+
+    async function initScanList() {
+      try {
+        const resp = await fetch("/api/scans");
+        availableScans = await resp.json();
+        onCategoryChanged();
+      } catch (err) {
+        console.error("Failed to load scans list:", err);
+      }
+    }
+
+    function onCategoryChanged() {
+      if (!availableScans) return;
+      const catSel = document.getElementById("category-select");
+      const scanSel = document.getElementById("scan-select");
+      const cat = catSel.value;
+
+      scanSel.innerHTML = "";
+      const scanList = availableScans[cat] || [];
+      scanList.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s.name;
+        opt.textContent = s.label || s.name;
+        scanSel.appendChild(opt);
+      });
+
+      scanSel.onchange = () => fetchScanData();
+      fetchScanData();
+    }
+
+    async function fetchScanData() {
+      const catSel = document.getElementById("category-select");
+      const scanSel = document.getElementById("scan-select");
+      const category = catSel.value || "labelled";
+      const scanId = scanSel.value || (availableScans && availableScans[category] && availableScans[category][0]?.name) || "slope_0_labelled.pcd";
+
+      document.getElementById("scan-name-val").textContent = "Processing " + scanId + "...";
+
+      try {
+        const resp = await fetch(`/api/process?category=${encodeURIComponent(category)}&scan=${encodeURIComponent(scanId)}`);
+        scanData = await resp.json();
+
+        // Update Card Telemetry
+        document.getElementById("data-mode-val").textContent = scanData.data_mode ? scanData.data_mode.replace("IITH DATASET", "").replace("PURE MODEL INFERENCE", "") : category.toUpperCase();
+        document.getElementById("scan-name-val").textContent = scanData.scan_name;
+        document.getElementById("fps-val").textContent = scanData.timings.fps + " FPS";
+        document.getElementById("decimation-val").textContent = scanData.stats.point_reduction_pct + "%";
+        document.getElementById("decimation-bar").style.width = scanData.stats.point_reduction_pct + "%";
+        document.getElementById("savings-25d-val").textContent = scanData.memory.savings_vs_25d + "%";
+        document.getElementById("savings-bar").style.width = scanData.memory.savings_vs_25d + "%";
+        document.getElementById("ram-val").textContent = scanData.memory.forge_mem_mb + " MB";
+        document.getElementById("cells-val").textContent = scanData.stats.total_active_cells.toLocaleString();
+        document.getElementById("potholes-val").textContent = scanData.stats.detected_potholes;
+        document.getElementById("latency-val").textContent = scanData.timings.total_ms + " ms";
+
+        render();
+      } catch (err) {
+        console.error("Failed to fetch scan data:", err);
+        document.getElementById("scan-name-val").textContent = "Error loading scan";
+      }
+    }
+
+    // Startup
+    initScanList().then(() => {
+      resizeCanvas();
+      fetchScanData();
+    });
+
+    // Team Details Modal Functions
+    function openTeamModal() {
+      const modal = document.getElementById("team-modal-backdrop");
+      if (modal) {
+        modal.style.display = "flex";
+      }
+    }
+
+    function closeTeamModal(e) {
+      const modal = document.getElementById("team-modal-backdrop");
+      if (modal) {
+        modal.style.display = "none";
+      }
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeTeamModal();
+      }
+    });
+  </script>
+</body>
+</html>
